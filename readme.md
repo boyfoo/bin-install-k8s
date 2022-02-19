@@ -728,6 +728,105 @@ WantedBy=multi-user.target
 
 获取加入是否成功 `kubectl get nodes`
 
+
+## 部署 kube-proxy
+
+`sudo cp /vagrant/master/kubernetes/server/bin/kube-proxy /usr/k8s/`
+
+### 创建证书请求文件
+
+`cd ~/certs/k8s/`
+
+```
+{
+  "CN": "system:kube-proxy",
+  "hosts": [],
+  "key": {
+    "algo": "rsa",
+    "size": 2048
+  },
+  "names": [
+    {
+      "C": "CN",
+      "L": "BeiJing",
+      "ST": "BeiJing",
+      "O": "kube-proxy",
+      "OU": "System"
+    }
+  ]
+}
+```
+
+生成： `cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=kubernetes kube-proxy-csr.json | cfssljson -bare kube-proxy`
+
+
+拷贝至指定目录: `sudo cp kube-proxy.pem /etc/k8s/certs && sudo cp kube-proxy-key.pem /etc/k8s/certs`
+
+### 创建config配置文件
+
+这部分最好在`root`环境下执行 不然容易读取`crt`证书失败
+
+```
+kubectl config set-cluster kubernetes \
+  --certificate-authority=/etc/k8s/certs/ca.pem \
+  --server=https://192.168.33.10:6443 \
+  --embed-certs=true \
+  --kubeconfig=kube-proxy.kubeconfig
+  
+kubectl config set-credentials kube-proxy \
+  --client-certificate=/etc/k8s/certs/kube-proxy.pem \
+  --client-key=/etc/k8s/certs/kube-proxy-key.pem \
+  --embed-certs=true \
+  --kubeconfig=kube-proxy.kubeconfig
+ 
+kubectl config set-context default \
+  --cluster=kubernetes \
+  --user=kube-proxy \
+  --kubeconfig=kube-proxy.kubeconfig
+
+kubectl config use-context default --kubeconfig=kube-proxy.kubeconfig
+```
+
+在当前文件夹生成了一个 `kube-proxy.kubeconfig` 文件
+
+复制当目录下 `sudo cp kube-proxy.kubeconfig /etc/k8s/configs`
+
+
+创建 `sudo vi /etc/k8s/configs/kube-proxy-config.yml`
+
+```
+kind: KubeProxyConfiguration
+apiVersion: kubeproxy.config.k8s.io/v1alpha1
+bindAddress: 0.0.0.0
+metricsBindAddress: 0.0.0.0:10249
+clientConnection:
+  kubeconfig: /etc/k8s/configs/kube-proxy.kubeconfig
+hostnameOverride: node01
+clusterCIDR: 10.0.0.0/24
+```
+
+### 创建服务文件
+
+`sudo vi /usr/lib/systemd/system/kube-proxy.service`
+
+```
+[Unit]
+Description=Kubernetes Proxy
+After=network.target
+[Service]
+ExecStart=/usr/k8s/kube-proxy \
+--logtostderr=false \
+--v=4 \
+--log-dir=/etc/k8s/logs \
+--config=/etc/k8s/configs/kube-proxy-config.yml
+Restart=on-failure
+LimitNOFILE=65536
+[Install]
+WantedBy=multi-user.target
+```
+
+`sudo systemctl daemon-reload && sudo systemctl start kube-proxy && sudo systemctl enable kube-proxy`
+
 # node:
 
 
