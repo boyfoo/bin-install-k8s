@@ -251,10 +251,11 @@ EOF
 `sudo vi /etc/k8s/configs/token.csv`
 
 ```
-239309f7162e1fefdfa8ff63932fdbc4,10001,"system:node-bootstrapper"
+239309f7162e1fefdfa8ff63932fdbc4,"kubelet-bootstrap",10001,"system:node-bootstrapper"
 ```
 
 ### 新增运行文件
+
 创建空文件: `sudo vi /etc/k8s/configs/kube-apiserver.conf`
 
 `sudo vi /usr/lib/systemd/system/kube-apiserver.service`
@@ -582,6 +583,150 @@ sudo systemctl daemon-reload
 sudo systemctl restart kube-scheduler
 sudo systemctl enable kube-scheduler
 ```
+
+查看是否正常
+
+```
+kubectl get cs
+```
+
+## 部署kubelet
+
+使用 `K8S1.4` 之后的 `TLS bootstraping` 方式动态签署发布证书
+
+
+`sudo cp /vagrant/master/kubernetes/server/bin/kubelet /usr/k8s`
+
+
+### 修改docker
+
+`sudo vim /etc/docker/daemon.json`
+
+内容如下
+
+```
+{
+  "exec-opts": ["native.cgroupdriver=systemd"]
+}
+```
+
+`sudo systemctl daemon-reload && sudo systemctl restart docker.service`
+
+确保成功 `docker info | grep Cgroup`
+
+### 配置文件
+
+`sudo vi /etc/k8s/configs/kubelet-config.yaml`
+
+内容
+
+```
+kind: KubeletConfiguration
+apiVersion: kubelet.config.k8s.io/v1beta1
+address: 0.0.0.0
+port: 10250
+readOnlyPort: 10255
+cgroupDriver: systemd
+clusterDNS:
+- 10.0.0.2
+clusterDomain: cluster.local 
+failSwapOn: true
+authentication:
+  anonymous:
+    enabled: false
+  webhook:
+    cacheTTL: 2m0s
+    enabled: true
+  x509:
+    clientCAFile: /etc/k8s/certs/ca.pem 
+authorization:
+  mode: Webhook
+  webhook:
+    cacheAuthorizedTTL: 5m0s
+    cacheUnauthorizedTTL: 30s
+evictionHard:
+  imagefs.available: 15%
+  memory.available: 100Mi
+  nodefs.available: 10%
+  nodefs.inodesFree: 5%
+maxOpenFiles: 1000000
+maxPods: 110
+```
+
+创建目录：`sudo mkdir /etc/k8s/configs/kubelet`
+
+帮`token.csv`内定义的角色绑定权限:
+
+`kubectl create clusterrolebinding kubelet-bootstrap --clusterrole=system:node-bootstrapper --user=kubelet-bootstrap`
+
+### 创建启动配置文件
+
+新增启动文件: `sudo vim /etc/k8s/configs/bootstrap.kubeconfig`
+
+```
+apiVersion: v1
+clusters:
+- cluster:
+    certificate-authority: /etc/k8s/certs/ca.pem
+    server: https://192.168.33.10:6443
+  name: kubernetes
+contexts:
+- context:
+    cluster: kubernetes
+    user: kubelet-bootstrap
+  name: default
+current-context: default
+kind: Config
+preferences: {}
+users:
+- name: kubelet-bootstrap
+  user:
+    token: 239309f7162e1fefdfa8ff63932fdbc4
+```
+
+里面 `user` 为 `token.csv` 里定义的用户名称，`token` 也是 `token.csv` 里定义的 `token`
+
+### 配置服务文件
+
+`sudo vi /usr/lib/systemd/system/kubelet.service`
+
+内容如下:
+
+```
+[Unit]
+Description=Kubernetes Kubelet
+After=docker.service
+[Service]
+ExecStart=/usr/k8s/kubelet \
+--logtostderr=false \
+--v=4 \
+--log-dir=/etc/k8s/logs \
+--hostname-override=node01 \
+--network-plugin=cni \
+--cni-bin-dir=/usr/k8s/cni \
+--kubeconfig=/etc/k8s/configs/kubelet.kubeconfig \
+--bootstrap-kubeconfig=/etc/k8s/configs/bootstrap.kubeconfig \
+--config=/etc/k8s/configs/kubelet-config.yaml \
+--cert-dir=/etc/k8s/certs/kubelet \
+--pod-infra-container-image=mirrorgooglecontainers/pause-amd64:3.0
+Restart=on-failure
+LimitNOFILE=65536
+[Install]
+WantedBy=multi-user.target
+```
+
+启动：
+
+`sudo systemctl daemon-reload && sudo systemctl start kubelet && sudo systemctl enable kubelet`
+
+## kubelet授权
+
+`kubectl get csr`
+
+允许加入：`kubectl certificate approve node-csr-9o-XimTiREqG_FslHEbl1jI4DbAxqv3f1xCYK2F3Dfs`
+
+
+获取加入是否成功 `kubectl get nodes`
 
 # node:
 
