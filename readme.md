@@ -27,7 +27,7 @@ source /etc/profile
 
 
 # mater:
-### ETCD证书
+## ETCD证书
 ### 创建证书临时文件夹
 ```
 sudo mkdir -p ~/certs/{etcd,k8s}
@@ -373,8 +373,6 @@ EOF
 
 `sudo cp /vagrant/master/kubernetes/server/bin/kube-controller-manager /usr/k8s`
 
-`sudo cp /vagrant/master/kubernetes/server/bin/kube-scheduler  /usr/k8s`
-
 `cd ~/certs/k8s/`
 
 
@@ -481,6 +479,110 @@ sudo systemctl daemon-reload
 sudo systemctl enable kube-controller-manager
 sudo systemctl start kube-controller-manager
 ```
+
+## 部署kube-scheduler
+
+`sudo cp /vagrant/master/kubernetes/server/bin/kube-scheduler  /usr/k8s`
+
+`cd ~/certs/k8s/`
+
+### 证书请求文件
+
+```
+cat > kube-scheduler-csr.json << EOF
+{
+    "CN": "system:kube-scheduler",
+    "key": {
+        "algo": "rsa",
+        "size": 2048
+    },
+    "hosts": [
+      "127.0.0.1",
+      "192.168.33.10"
+    ],
+    "names": [
+      {
+        "C": "CN",
+        "ST": "BeiJing",
+        "L": "BeiJing",
+        "O": "system:kube-scheduler"
+      }
+    ]
+}
+EOF
+```
+
+
+生成证书
+
+`cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=kubernetes kube-scheduler-csr.json  | cfssljson -bare kube-scheduler`
+
+拷贝文件
+
+`sudo cp kube-scheduler.pem /etc/k8s/certs && sudo cp kube-scheduler-key.pem /etc/k8s/certs`
+
+### 新增配置文件
+
+`sudo vi /etc/k8s/configs/kube-scheduler.kubeconfig`
+
+内容如下:
+
+```
+apiVersion: v1
+clusters:
+- cluster:
+    certificate-authority: /etc/k8s/certs/ca.pem
+    server: https://192.168.33.10:6443
+  name: kubernetes
+contexts:
+- context:
+    cluster: kubernetes
+    user: system:kube-scheduler
+  name: default
+current-context: default
+kind: Config
+preferences: {}
+users:
+- name: system:kube-scheduler
+  user:
+    client-certificate: /etc/k8s/certs/kube-scheduler.pem
+    client-key: /etc/k8s/certs/kube-scheduler-key.pem
+```
+
+### 新增服务文件
+
+`sudo vi /usr/lib/systemd/system/kube-scheduler.service`
+
+内容如下：
+
+```
+[Unit]
+Description=Kubernetes Scheduler
+Documentation=https://github.com/kubernetes/kubernetes
+[Service]
+ExecStart=/usr/k8s/kube-scheduler \
+--logtostderr=true \
+--v=4 \
+--kubeconfig=/etc/k8s/configs/kube-scheduler.kubeconfig \
+--log-dir=/etc/k8s/logs \
+--master=https://192.168.33.10:6443 \
+--bind-address=127.0.0.1
+--tls-cert-file=/etc/k8s/certs/kube-scheduler.pem \
+--tls-private-key-file=/etc/k8s/certs/kube-scheduler-key.pem \
+--client-ca-file=/etc/k8s/certs/ca.pem
+Restart=on-failure
+[Install]
+WantedBy=multi-user.target
+```
+
+启动：
+
+```
+sudo systemctl daemon-reload
+sudo systemctl restart kube-scheduler
+sudo systemctl enable kube-scheduler
+```
+
 # node:
 
 
