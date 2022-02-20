@@ -1,5 +1,3 @@
-
-
 ### 创建统一管理文件夹
 `sudo mkdir /usr/k8s`
 ### 复制etcd执行文件
@@ -24,7 +22,6 @@ export PATH=$PATH:$CFSSLBIN
 # 刷新环境变量
 source /etc/profile
 ```
-
 
 # mater:
 ## ETCD证书
@@ -1136,6 +1133,20 @@ EOF
 
 创建 `kubectl apply -f kube-flannel.yaml`
 
+
+注意：宿主机使用的网卡，默认第一个网卡，如果第一个是无法网络通信的网卡需要修改:
+
+```
+args:
+        - --ip-masq
+        - --kube-subnet-mgr
+        - --iface=eth1  // 指定为eth1网卡 
+
+
+# 查看修改后 重新kubectl apply -f kube-flannel.yaml 
+kubectl describe node node02 | grep public-ip // 正确返回应该是主机ip 192.168.33.11 
+```
+
 ## 创建coreDNS
 
 复制官方文件 `sudo cp /vagrant/master/kubernetes/kubernetes-src/cluster/addons/dns/coredns/coredns.yaml.base ~/coredns.yaml`
@@ -1154,12 +1165,125 @@ EOF
 
 # node:
 
+`centos` 系统基本配置，包括防火墙路由转发
+
+### 创建文件夹
+
+```
+mkdir /usr/k8s
+mkdir /usr/k8s/cni
+mkdir /home/vagrant/.kube
+mkdir -p /etc/k8s/{certs,configs,logs}
+mkdir /etc/k8s/certs/kubelet
+```
+
+从`master`机上复制证书到`node`节点 
+
+以下内容在主节点执行
+
+```
+scp /etc/k8s/certs/ca.pem root@192.168.33.11:/etc/k8s/certs
+scp /usr/k8s/cni/* root@192.168.33.11:/usr/k8s/cni
+scp /etc/k8s/configs/kubelet-config.yaml root@192.168.33.11:/etc/k8s/configs/
+scp /home/vagrant/.kube/config root@192.168.33.11:/home/vagrant/.kube/
+scp /etc/k8s/configs/bootstrap.kubeconfig root@192.168.33.11:/etc/k8s/configs/
+scp /etc/k8s/configs/kube-proxy.kubeconfig root@192.168.33.11:/etc/k8s/configs/
+scp /etc/k8s/configs/kube-proxy-config.yml root@192.168.33.11:/etc/k8s/configs/
+```
+
+注意 `kube-proxy-config.yml` 内的`hostname`要修改
+
+### 复制执行文件
+
+```
+cd /vagrant/node/kubernetes/node/bin/
+cp kubectl kubelet kube-proxy /usr/k8s/
+```
 
 
+### 修改docker
+
+`sudo vim /etc/docker/daemon.json`
+
+内容如下
+
+```
+{
+  "exec-opts": ["native.cgroupdriver=systemd"]
+}
+```
+
+`sudo systemctl daemon-reload && sudo systemctl restart docker.service`
+
+### 运行kubelet
+
+### 配置服务文件
+
+`sudo vi /usr/lib/systemd/system/kubelet.service`
+
+内容如下:
+
+```
+[Unit]
+Description=Kubernetes Kubelet
+After=docker.service
+[Service]
+ExecStart=/usr/k8s/kubelet \
+--logtostderr=false \
+--v=4 \
+--log-dir=/etc/k8s/logs \
+--hostname-override=node02 \
+--network-plugin=cni \
+--cni-bin-dir=/usr/k8s/cni \
+--kubeconfig=/etc/k8s/configs/kubelet.kubeconfig \
+--bootstrap-kubeconfig=/etc/k8s/configs/bootstrap.kubeconfig \
+--config=/etc/k8s/configs/kubelet-config.yaml \
+--cert-dir=/etc/k8s/certs/kubelet \
+--pod-infra-container-image=mirrorgooglecontainers/pause-amd64:3.0
+Restart=on-failure
+LimitNOFILE=65536
+[Install]
+WantedBy=multi-user.target
+```
+
+`sudo systemctl daemon-reload && sudo systemctl start kubelet && sudo systemctl enable kubelet`
+ 
+### 申请加入
+
+在`master`执行
+
+```
+kubectl get csr
+kubectl certificate approve node-csr-ljZrWNpxeeRaQrZhN2Tq9B1v8nFE_W
+```
+
+### 安装kubeproxy
+
+### 创建服务文件
+
+`sudo vi /usr/lib/systemd/system/kube-proxy.service`
+
+```
+[Unit]
+Description=Kubernetes Proxy
+After=network.target
+[Service]
+ExecStart=/usr/k8s/kube-proxy \
+--logtostderr=false \
+--v=4 \
+--log-dir=/etc/k8s/logs \
+--config=/etc/k8s/configs/kube-proxy-config.yml
+Restart=on-failure
+LimitNOFILE=65536
+[Install]
+WantedBy=multi-user.target
+```
+
+`sudo systemctl daemon-reload && sudo systemctl start kube-proxy && sudo systemctl enable kube-proxy`
 
 
+### 修改节点标签
 
-
-
+`kubectl label node node02 node-role.kubernetes.io/node=node`
 
 
