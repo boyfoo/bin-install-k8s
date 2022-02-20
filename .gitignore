@@ -5,3 +5,9 @@ etcd-v3.4.14/
 master/
 node/
 ssltool/
+/.idea
+/.idea/*
+.idea
+.idea/*
+src/.idea
+src/.idea/*
