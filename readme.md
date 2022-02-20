@@ -1134,6 +1134,24 @@ spec:
 EOF
 ```
 
+创建 `kubectl apply -f kube-flannel.yaml`
+
+## 创建coreDNS
+
+复制官方文件 `sudo cp /vagrant/master/kubernetes/kubernetes-src/cluster/addons/dns/coredns/coredns.yaml.base ~/coredns.yaml`
+
+修改一下：
+
+```
+70行   kubernetes __DNS__DOMAIN__ in-addr.arpa ip6.arpa => kubernetes cluster.local. in-addr.arpa ip6.arpa
+135行  image: k8s.gcr.io/coredns:1.7.0 => image: coredns/coredns:1.7.0
+140行  memory: __DNS__MEMORY__LIMIT__ => memory: 250Mi
+207行  clusterIP: __DNS__SERVER__ => clusterIP: 10.0.0.2
+```
+
+启动 `kubectl apply -f coredns.yaml`
+
+
 # node:
 
 
