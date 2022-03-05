@@ -1,0 +1,45 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: myhood
+webhooks:
+  - clientConfig:
+      # cat ca.pem | base64 通过前面的命令获取ca的base64编码文件
+      caBundle: |
+        LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSURoakNDQW02Z0F3SUJBZ0lVTi8zcFU1RWxG
+        ZmpkbCtlUXRzbU1QcFpxOXdJd0RRWUpLb1pJaHZjTkFRRUwKQlFBd1NURUxNQWtHQTFVRUJoTUNl
+        bWd4Q3pBSkJnTlZCQWNUQW1KcU1Rc3dDUVlEVlFRS0V3SmlhakVMTUFrRwpBMVVFQ3hNQ1EwRXhF
+        ekFSQmdOVkJBTVRDa3QxWW1WeWJtVjBaWE13SGhjTk1qSXdNekExTURrek1EQXdXaGNOCk1qY3dN
+        ekEwTURrek1EQXdXakJKTVFzd0NRWURWUVFHRXdKNmFERUxNQWtHQTFVRUJ4TUNZbW94Q3pBSkJn
+        TlYKQkFvVEFtSnFNUXN3Q1FZRFZRUUxFd0pEUVRFVE1CRUdBMVVFQXhNS1MzVmlaWEp1WlhSbGN6
+        Q0NBU0l3RFFZSgpLb1pJaHZjTkFRRUJCUUFEZ2dFUEFEQ0NBUW9DZ2dFQkFNUVNXNU5EdFRtajlu
+        RmEybzFUM01sdjl6NDlCMnRECjZyd3lxMkg3ZmQ0amNUWHF1OWV0Q25WVTM4bkJHS05KV01GYjZI
+        aHVHQ28wZ0Y4eW5FUURjT3o4VWJMcHUwNlYKV0l0dTJHaHZpZ2k0VUJtU2d3eE1pNDRkWno5S3NN
+        dEJqQ2dlQ2xXc0xTVTYxNG5ubm1oQ3dERzJhTklCRTh0UgpzZEg2MWFiVEFpT0U2bGRweG9HT1dh
+        UXRqOHdSQTV3MVRFckFXRUVvWHAweEpEUW1pdk1QQW1jMU5oT3RnN2N1Ck1KSWJReHFuMG5ZVThG
+        UkJJZ2ZnbW5JM092aENxMXJBVEk1N2F4T0k0cjUyS1hPeUxqL2JoQm5ocEpiTkhoaXYKS2pYcmFV
+        N29FbTFlcVRoOGcyY1RmQUdpSXNsRTczUy8yekNMWDgyYUVGclJCSHd4UHBhOXRCa0NBd0VBQWFO
+        bQpNR1F3RGdZRFZSMFBBUUgvQkFRREFnRUdNQklHQTFVZEV3RUIvd1FJTUFZQkFmOENBUUl3SFFZ
+        RFZSME9CQllFCkZJajlwYnRuZjVPT2ZXZVdiWS85NjRXSWF6c21NQjhHQTFVZEl3UVlNQmFBRklq
+        OXBidG5mNU9PZldlV2JZLzkKNjRXSWF6c21NQTBHQ1NxR1NJYjNEUUVCQ3dVQUE0SUJBUURBNFNS
+        bkVOS2ZPa04vRmJ0MEZkNzIzMTlyWVJHRQpFVW9nZVlxb3VJN1FTdjJrNERMZDFxNm5jSUdRU3lE
+        QmpaUmRqV2FXcm8zdEdselNmaXdia0ptVEFkVDVWbXNNCk1GbXN2UGtXWHYzWUF4TVVXZVJjc0tR
+        MnNjQ3dyNENXSzVVcTVLekcrNDB2MXpZL1NtOERaWWF5SUM3bFRyalAKaWVXeG92QkloNXBwREla
+        Q3VnWUIwY0V4cDNwbXRvNE9aQ2FtUUI4WGxYTHo5V21pZmRVaFd1NUZVWWdMTXdhZAozK0FMcjM5
+        aW55YTNXUzFYZlNBRTBFZ2F1bmVKbjhBRmliSVBiRGVub3JCL1VrdUt2NGh0czRVYytucWVvTFpU
+        CkkrelNrdzhYejhjVmpxSjBwV1lOUzJhQUFTTXB3WEhXYlhuV2hhU3hUcGZsSVpicUNYVmpZa1ZQ
+        Ci0tLS0tRU5EIENFUlRJRklDQVRFLS0tLS0K
+      service: #准入控制器代理到的服务 等于deploy.yaml内的服务
+        name: myhook
+        namespace: kube-system
+        path: /pods # 就是访问的路径 为什么是这个路径 因为main.go代码里用的是这个路径
+    failurePolicy: Fail
+    sideEffects: NoneOnDryRun
+    name: myhook.jtthink.com #随意
+    admissionReviewVersions: [ "v1", "v1beta1" ]
+    namespaceSelector: { }
+    rules: #哪些事件要转发到这个准入控制器来
+      - apiGroups: [ "" ] # core的可以不写为空，k8s里groups为空就代表core
+        apiVersions: [ "v1" ]
+        operations: [ "CREATE" ]
+        resources: [ "pods" ]

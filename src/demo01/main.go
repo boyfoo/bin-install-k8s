@@ -16,7 +16,7 @@ import (
 // 准入控制器 https://kubernetes.io/zh/docs/reference/access-authn-authz/extensible-admission-controllers/
 // 完成内容 部署的pod只能是指定的名字
 func main() {
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/pods", func(w http.ResponseWriter, r *http.Request) {
 		log.Println(r.RequestURI)
 		// 读取请求的内容
 		var body []byte
@@ -45,11 +45,27 @@ func main() {
 			rspAdmissionReview.Response = lib.AdmitPods(reqAdmissionReview) //我们的业务
 		}
 		rspAdmissionReview.Response.UID = reqAdmissionReview.Request.UID
-		respBytes, _ := json.Marshal(rspAdmissionReview)
-		// 响应回去
-		w.Write(respBytes)
+		respBytes, err := json.Marshal(rspAdmissionReview)
+		if err != nil {
+			klog.Error(err)
+		} else {
+			if _, err := w.Write(respBytes); err != nil {
+				klog.Error(err)
+			}
+		}
 	})
 
 	fmt.Println("启动")
-	http.ListenAndServe(":8080", nil)
+	// 不使用tls 简单测试启动 这个启动方法才能用client.go测试 如果使用后面的tls启动client.go无效
+	//http.ListenAndServe(":8080", nil)
+
+	tlsConfig := lib.Config{
+		CertFile: "/etc/webhook/certs/tls.crt", // 为什么是这个路径，没有为什么，个人喜好随意来
+		KeyFile:  "/etc/webhook/certs/tls.key",
+	}
+	server := &http.Server{
+		Addr:      ":443", // TLS默认443
+		TLSConfig: lib.ConfigTLS(tlsConfig),
+	}
+	server.ListenAndServeTLS("", "") // 没有传参数，因为上面已经配置了tls路径
 }

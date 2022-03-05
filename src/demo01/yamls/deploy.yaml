@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: myhook
+  namespace: kube-system  #要挂载的证书也在这个命名空间
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: myhook
+  template:
+    metadata:
+      labels:
+        app: myhook
+    spec:
+      nodeName: node01 # 因为main.go的执行文件放在这个节点上，没有为什么
+      containers:
+        - name: myhook
+          image: alpine:3.12
+          imagePullPolicy: IfNotPresent
+          command: [ "/app/myhook" ]
+          volumeMounts:
+            - name: hooktls
+              mountPath: /etc/webhook/certs #这个挂载目录就是main.go代码内写的证书目录
+              readOnly: true
+            - name: app
+              mountPath: /app
+          ports:
+            - containerPort: 443
+      volumes:
+        - name: app
+          hostPath:
+            path: /vagrant/src/demo01 #main执行文件放到的node01接口上的路径
+        - name: hooktls
+          secret:
+            secretName: myhook  #证书秘钥
+---
+apiVersion: v1
+kind: Service
+metadata: #对应admconfig.yaml内的service
+  name: myhook
+  namespace: kube-system
+  labels:
+    app: myhook
+spec:
+  type: ClusterIP
+  ports:
+    - port: 443
+      targetPort: 443
+  selector:
+    app: myhook
