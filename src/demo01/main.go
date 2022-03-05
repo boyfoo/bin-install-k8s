@@ -44,6 +44,7 @@ func main() {
 			// decode成功 执行我们业务内容
 			rspAdmissionReview.Response = lib.AdmitPods(reqAdmissionReview) //我们的业务
 		}
+		// 不管是否通过都要设置id
 		rspAdmissionReview.Response.UID = reqAdmissionReview.Request.UID
 		respBytes, err := json.Marshal(rspAdmissionReview)
 		if err != nil {

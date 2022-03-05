@@ -37,7 +37,14 @@ webhooks:
     sideEffects: NoneOnDryRun
     name: myhook.jtthink.com #随意
     admissionReviewVersions: [ "v1", "v1beta1" ]
+    # 匹配命名空间标签 符合的才执行 (给需要处理的命名空间上加上标签)
     namespaceSelector: { }
+#    namespaceSelector: {
+#      matchExpressions:
+#        - key: xx
+#          operator: In
+#          values: [ "xx's value" ]
+#    }
     rules: #哪些事件要转发到这个准入控制器来
       - apiGroups: [ "" ] # core的可以不写为空，k8s里groups为空就代表core
         apiVersions: [ "v1" ]

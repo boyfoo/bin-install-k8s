@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: Pod
 metadata:
-  name: shenyi
+  name: shenyi1
   namespace: default
 spec:
   containers:

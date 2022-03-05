@@ -8,6 +8,20 @@ import (
 	"k8s.io/klog/v2"
 )
 
+// patch更新内容
+// https://kubernetes.io/zh/docs/tasks/manage-kubernetes-objects/update-api-object-kubectl-patch/
+func patchImage() []byte {
+	str := `[
+	{
+		"op": "replace",
+		"path": "/spec/containers/0/image",
+		"value": "nginx:1.19-alpine"
+	}
+]
+`
+	return []byte(str)
+}
+
 func AdmitPods(ar v1.AdmissionReview) *v1.AdmissionResponse {
 	podResource := metav1.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}
 	fmt.Println("request")
@@ -39,6 +53,10 @@ func AdmitPods(ar v1.AdmissionReview) *v1.AdmissionResponse {
 		reviewResponse.Result = &metav1.Status{Code: 503, Message: "pod name cannot be shenyi"}
 	} else {
 		reviewResponse.Allowed = true
+		//  模拟修改一个镜像
+		reviewResponse.Patch = patchImage()
+		jsonPt := v1.PatchTypeJSONPatch
+		reviewResponse.PatchType = &jsonPt
 	}
 
 	return &reviewResponse
