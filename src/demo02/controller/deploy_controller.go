@@ -3,7 +3,6 @@ package controller
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"github.com/gin-gonic/gin"
 	"io/ioutil"
 	appsv1 "k8s.io/api/apps/v1"
@@ -33,19 +32,40 @@ func (d *DeployController) Show(name string) (*appsv1.Deployment, error) {
 }
 
 func (d *DeployController) getPodsByDeployment(dep *appsv1.Deployment) (*corev1.PodList, error) {
+	// 标签选择 获取选择
+	selector, err := metav1.LabelSelectorAsSelector(dep.Spec.Selector)
+	if err != nil {
+		return nil, err
+	}
 
-	// 标签选择
-	labels := ""
-	for k, v := range dep.Spec.Selector.MatchLabels {
-		if labels != "" {
-			labels += ","
+	// deployment 调度 ReplicaSets ， ReplicaSets 调度 pod
+	// 不能使用deployment直接获取pod，可能因为标签一样获取到其他的pod
+	// 可能获取到多个ReplicaSets 应该deployment控制的最新的ReplicaSets
+	// 通过命令行获取最新，例: kubectl describe deployment nginx-deployment-name01 | grep NewReplicaSet
+	ReplicaList, err := d.client.AppsV1().ReplicaSets(dep.Namespace).List(
+		context.Background(), metav1.ListOptions{LabelSelector: selector.String()},
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	replicaListSelector := ""
+	for _, item := range ReplicaList.Items {
+		// 是否是dep当前控制的set
+		if IsCurrentRsByDep(dep, &item) {
+			retSelector, err := metav1.LabelSelectorAsSelector(item.Spec.Selector)
+			if err != nil {
+				break
+			}
+			replicaListSelector = retSelector.String()
+			break
 		}
-		labels += fmt.Sprintf("%s=%s", k, v)
 	}
 
 	podList, err := d.client.CoreV1().Pods(dep.Namespace).List(context.TODO(), metav1.ListOptions{
-		LabelSelector: labels,
+		LabelSelector: replicaListSelector,
 	})
+
 	if err != nil {
 		return nil, err
 	}
@@ -218,6 +238,23 @@ func DeployRoute(client *kubernetes.Clientset, r *gin.Engine) {
 
 		ctx.JSON(http.StatusOK, updateScale)
 	})
+}
+
+// IsCurrentRsByDep set是否是dep的当前set
+func IsCurrentRsByDep(dep *appsv1.Deployment, set *appsv1.ReplicaSet) bool {
+	// 版本不相等直接不是
+	if dep.ObjectMeta.Annotations["deployment.kubernetes.io/revision"] == set.ObjectMeta.Annotations["deployment.kubernetes.io/revision"] {
+		return false
+	}
+
+	// set引用是否是对应dep
+	for _, reference := range set.OwnerReferences {
+		if reference.Kind == "Deployment" && reference.Name == dep.Name {
+			return true
+		}
+	}
+
+	return false
 }
 
 // 获取镜像

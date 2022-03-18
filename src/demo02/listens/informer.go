@@ -16,7 +16,7 @@ import (
 func NewSharedInformer(clientset *kubernetes.Clientset) {
 	factory := informers.NewSharedInformerFactory(clientset, 0)
 
-	// 创建dep监听
+	// 创建所有dep监听
 	deployments := factory.Apps().V1().Deployments()
 	deployments.Informer().AddEventHandler(&DepHandler{})
 	//depInformer.Run(wait.NeverStop)
