@@ -2,7 +2,11 @@
 GET http://localhost:8000/deploy
 Content-Type: application/json
 
-### 从文件中创建
+### 单个详情
+GET http://localhost:8000/deploy/nginx-deployment-name01
+Content-Type: application/json
+
+### 从文件中创建deploy
 POST http://localhost:8000/deploy
 Content-Type: application/json
 
@@ -10,7 +14,7 @@ Content-Type: application/json
   "path": "/Users/rxt/Desktop/my/vagrant-k8s/src/demo02/yamls/nginx.yaml"
 }
 
-### 通过文件删除
+### 通过文件删除deploy
 DELETE http://localhost:8000/deploy
 Content-Type: application/json
 
@@ -18,6 +22,12 @@ Content-Type: application/json
   "path": "/Users/rxt/Desktop/my/vagrant-k8s/src/demo02/yamls/nginx.yaml"
 }
 
+### 增加/减少副本数量
+POST http://localhost:8000/deploy-scale
+Content-Type: application/json
 
-
-###
+// dec true减少 false增加
+{
+  "deployment_name": "nginx-deployment-name01",
+  "dec": true
+}
