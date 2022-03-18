@@ -1,0 +1,23 @@
+### 列表
+GET http://localhost:8000/deploy
+Content-Type: application/json
+
+### 从文件中创建
+POST http://localhost:8000/deploy
+Content-Type: application/json
+
+{
+  "path": "/Users/rxt/Desktop/my/vagrant-k8s/src/demo02/yamls/nginx.yaml"
+}
+
+### 通过文件删除
+DELETE http://localhost:8000/deploy
+Content-Type: application/json
+
+{
+  "path": "/Users/rxt/Desktop/my/vagrant-k8s/src/demo02/yamls/nginx.yaml"
+}
+
+
+
+###
