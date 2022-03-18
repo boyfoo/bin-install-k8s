@@ -29,5 +29,5 @@ Content-Type: application/json
 // dec true减少 false增加
 {
   "deployment_name": "nginx-deployment-name01",
-  "dec": true
+  "dec": false
 }
