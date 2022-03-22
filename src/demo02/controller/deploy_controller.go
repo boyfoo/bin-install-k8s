@@ -155,10 +155,12 @@ func DeployRoute(client *kubernetes.Clientset, r *gin.Engine) {
 		var podsMap []map[string]interface{}
 		for _, pod := range podList.Items {
 			podsMap = append(podsMap, map[string]interface{}{
-				"名称":   pod.Name,
-				"镜像":   getImagesByPod(&pod),
-				"所属节点": pod.Spec.NodeName,
-				"创建时间": pod.CreationTimestamp.Format(common.GoTime),
+				"1.名称":   pod.Name,
+				"2.镜像":   getImagesByPod(&pod),
+				"3.所属节点": pod.Spec.NodeName,
+				"4.创建时间": pod.CreationTimestamp.Format(common.GoTime),
+				"5.阶段":   pod.Status.Phase,
+				"6.信息":   GetMessage(&pod),
 			})
 		}
 
@@ -255,6 +257,16 @@ func IsCurrentRsByDep(dep *appsv1.Deployment, set *appsv1.ReplicaSet) bool {
 	}
 
 	return false
+}
+
+func GetMessage(pod *corev1.Pod) string {
+	msg := ""
+	for _, condition := range pod.Status.Conditions {
+		if condition.Status != "True" {
+			msg += condition.Message
+		}
+	}
+	return msg
 }
 
 // 获取镜像
