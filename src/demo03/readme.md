@@ -50,9 +50,64 @@ metadata:
   name: myredis
 # 上面的都是基本格式，下面的是自定义格式(但是也要按照规范自定义)
 spec: # 对应RedisBoyfooSpec结构体
-  post: 1011
+  post: 101122
 ```
 
-按照`crd`到`k8s`中: `make install` 
+发布`crd`到`k8s`中: `make install`
 
 查看按照结果: `kb get crd`
+
+若要重新发布最新的`crd`: `make uninstall && make install`
+
+### 修改逻辑
+
+修改业务文件`controllers\redisboyfoo_controller.go`
+
+```go
+package controllers
+
+func (r *RedisBoyfooReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	_ = log.FromContext(ctx)
+
+	redisBoyfoo := &myappv1.RedisBoyfoo{}
+	// 获取yaml提交来创建的信息 
+	if err := r.Get(ctx, req.NamespacedName, redisBoyfoo); err != nil {
+		fmt.Println(err)
+	} else {
+		fmt.Println("得到对象")
+		fmt.Println(redisBoyfoo)
+	}
+
+	return ctrl.Result{}, nil
+}
+```
+
+本地运行控制器调试 `make run`，另起一个终端发布资源`kb apply -f test/redis.yaml`，可以在前一个终端看见打印的数据内容
+
+### spec 验证
+
+文档地址 `https://book.kubebuilder.io/reference/markers/crd-validation.html`
+
+```go
+package v1
+
+type RedisBoyfooSpec struct {
+	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
+	// Important: Run "make" to regenerate code after modifying this file
+
+	// Foo is an example field of RedisBoyfoo. Edit redisboyfoo_types.go to remove/update
+	//Foo string `json:"foo,omitempty"`
+	// +kubebuilder:validation:Minimum:=80
+	// +kubebuilder:validation:Maximum:=1000
+	Port int `json:"port,omitempty"`
+}
+```
+
+重新安装`make uninstall && make install`
+
+启动`make run`
+
+新增资源: `kubectl apply -f test/redis.yaml`，会提示验证错误 `port` 值太大
+
+可以查看控制器有哪些规则 `kb describe crd redisboyfooes.myapp.boyfoo.com`
+
