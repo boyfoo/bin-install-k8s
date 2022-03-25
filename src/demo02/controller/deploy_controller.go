@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"github.com/gin-gonic/gin"
 	"io/ioutil"
 	appsv1 "k8s.io/api/apps/v1"
@@ -12,6 +13,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"net/http"
 	"src/demo02/common"
+	"src/demo02/listens"
 )
 
 type DeployController struct {
@@ -62,6 +64,7 @@ func (d *DeployController) getPodsByDeployment(dep *appsv1.Deployment) (*corev1.
 		}
 	}
 
+	fmt.Println(replicaListSelector)
 	podList, err := d.client.CoreV1().Pods(dep.Namespace).List(context.TODO(), metav1.ListOptions{
 		LabelSelector: replicaListSelector,
 	})
@@ -114,6 +117,18 @@ func (d *DeployController) getJsonByYamlFile(path string) (*appsv1.Deployment, e
 	return dep, nil
 }
 
+func (d *DeployController) getPodMessage(pod *corev1.Pod) string {
+	list, err := d.client.CoreV1().Events(pod.Namespace).List(context.Background(), metav1.ListOptions{})
+	if err != nil {
+		return err.Error()
+	}
+	for _, item := range list.Items {
+		if item.InvolvedObject.Name == pod.Name && item.InvolvedObject.Kind == pod.Kind {
+		}
+	}
+	return ""
+}
+
 func DeployRoute(client *kubernetes.Clientset, r *gin.Engine) {
 	deployController := NewDeployController(client)
 	r.GET("deploy", func(ctx *gin.Context) {
@@ -161,6 +176,8 @@ func DeployRoute(client *kubernetes.Clientset, r *gin.Engine) {
 				"4.创建时间": pod.CreationTimestamp.Format(common.GoTime),
 				"5.阶段":   pod.Status.Phase,
 				"6.信息":   GetMessage(&pod),
+				"7.准备就绪": getPodIsReady(&pod),
+				"8.MSG":  listens.EvenMap.GetMessage(pod.Namespace, "Pod", pod.Name),
 			})
 		}
 
@@ -245,7 +262,7 @@ func DeployRoute(client *kubernetes.Clientset, r *gin.Engine) {
 // IsCurrentRsByDep set是否是dep的当前set
 func IsCurrentRsByDep(dep *appsv1.Deployment, set *appsv1.ReplicaSet) bool {
 	// 版本不相等直接不是
-	if dep.ObjectMeta.Annotations["deployment.kubernetes.io/revision"] == set.ObjectMeta.Annotations["deployment.kubernetes.io/revision"] {
+	if dep.ObjectMeta.Annotations["deployment.kubernetes.io/revision"] != set.ObjectMeta.Annotations["deployment.kubernetes.io/revision"] {
 		return false
 	}
 
@@ -285,6 +302,24 @@ func getImagesByPod(item *corev1.Pod) string {
 		images += c.Image
 	}
 	return images
+}
+
+// 获取pod是否就绪
+func getPodIsReady(pod *corev1.Pod) bool {
+	for _, condition := range pod.Status.Conditions {
+		if condition.Type == corev1.ContainersReady && condition.Status != corev1.ConditionTrue {
+			return false
+		}
+	}
+
+	for _, rg := range pod.Spec.ReadinessGates {
+		for _, condition := range pod.Status.Conditions {
+			if condition.Type == rg.ConditionType && condition.Status != "True" {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 func NewDeployController(client *kubernetes.Clientset) *DeployController {

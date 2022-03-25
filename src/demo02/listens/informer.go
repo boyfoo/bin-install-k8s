@@ -21,5 +21,8 @@ func NewSharedInformer(clientset *kubernetes.Clientset) {
 	deployments.Informer().AddEventHandler(&DepHandler{})
 	//depInformer.Run(wait.NeverStop)
 
+	events := factory.Core().V1().Events()
+	events.Informer().AddEventHandler(&EvensHandler{})
+
 	factory.Start(wait.NeverStop)
 }
