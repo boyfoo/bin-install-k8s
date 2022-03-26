@@ -97,6 +97,7 @@ type RedisBoyfooSpec struct {
 
 	// Foo is an example field of RedisBoyfoo. Edit redisboyfoo_types.go to remove/update
 	//Foo string `json:"foo,omitempty"`
+	// 校验文档地址 https://book.kubebuilder.io/reference/markers/crd-validation.html
 	// +kubebuilder:validation:Minimum:=80
 	// +kubebuilder:validation:Maximum:=1000
 	Port int `json:"port,omitempty"`
@@ -111,3 +112,43 @@ type RedisBoyfooSpec struct {
 
 可以查看控制器有哪些规则 `kb describe crd redisboyfooes.myapp.boyfoo.com`
 
+### 为资源新增创建pod功能
+
+修改文件`redisboyfoo_controller.go`：
+
+```go
+package controllers
+
+import (
+	"context"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
+	myappv1 "k8sapi2/api/v1"
+)
+
+func CreateRedis(client client.Client, redisBoyfooConfig *myappv1.RedisBoyfoo) error {
+	newpod := &corev1.Pod{}
+	newpod.Namespace = redisBoyfooConfig.Namespace
+	newpod.Name = redisBoyfooConfig.Name
+	newpod.Spec.Containers = []corev1.Container{
+		{
+			Name:            redisBoyfooConfig.Name,
+			Image:           "redis:5-alpine",
+			ImagePullPolicy: corev1.PullIfNotPresent,
+			Ports: []corev1.ContainerPort{
+				{
+					ContainerPort: int32(redisBoyfooConfig.Spec.Port),
+				},
+			},
+		},
+	}
+	return client.Create(context.Background(), newpod)
+}
+```
+
+### 删除pod
+
+使用 `Finalizers` 原理删除
