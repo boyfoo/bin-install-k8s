@@ -266,7 +266,11 @@ func IsCurrentRsByDep(dep *appsv1.Deployment, set *appsv1.ReplicaSet) bool {
 		return false
 	}
 
-	// set引用是否是对应dep
+	return IsRsFromDep(dep, set)
+}
+
+// set引用是否是对应dep
+func IsRsFromDep(dep *appsv1.Deployment, set *appsv1.ReplicaSet) bool {
 	for _, reference := range set.OwnerReferences {
 		if reference.Kind == "Deployment" && reference.Name == dep.Name {
 			return true
