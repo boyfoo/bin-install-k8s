@@ -178,6 +178,7 @@ func DeployRoute(client *kubernetes.Clientset, r *gin.Engine) {
 				"6.信息":   GetMessage(&pod),
 				"7.准备就绪": getPodIsReady(&pod),
 				"8.MSG":  listens.EvenMap.GetMessage(pod.Namespace, "Pod", pod.Name),
+				"IP":     []string{pod.Status.PodIP, pod.Status.HostIP},
 			})
 		}
 
